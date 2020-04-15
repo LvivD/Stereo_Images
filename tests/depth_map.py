@@ -14,8 +14,8 @@ class depth_map:
 
         self.img_left = img_left
         self.img_right = img_right
-        self.shifted_maps = {}
-        self.mass_cooficients_maps = {}
+        self.shifted_maps = []
+        self.mass_cooficients_maps = []
         
     def check_image_order(self):
         pass
@@ -43,7 +43,11 @@ class depth_map:
     
     def get_shifted_map(self, step, save=True, cache=True, prt=False):
         
-        if cache and step in self.shifted_maps:
+        if len(self.shifted_maps) <= step:
+            self.shifted_maps += [None for i in range(step - len(self.shifted_maps) + 1)]
+            
+        
+        if cache and not (self.shifted_maps[step] is None):
             if prt:
                 plt.imshow(self.shifted_maps[step])
             return self.shifted_maps[step]
@@ -70,18 +74,13 @@ class depth_map:
         
     def get_shifted_maps(self, steps, save=True, cache=True):
         
-        if type(steps) == int:
-            steps = range(steps)
+        res = [None for i in range(steps)]
         
-        res = {}
-        
-        for step in steps:
+        for step in range(steps):
         
             current_shifted_map = self.get_shifted_map(step, save=save, cache=cache)
             
             res[step] = current_shifted_map
-            if save:
-                self.shifted_maps[step] = current_shifted_map
             
         return res
     
@@ -111,14 +110,17 @@ class depth_map:
             
 #         return mass_cooficients_map
     
-    def get_mass_cooficients_map(self, step, save=True, cache=True, prt=False):
+    def get_mass_cooficients_map(self, step, mass_cooficients_matrix=np.ones((5,5),np.float32)/25, save=True, cache=True, prt=False):
         
-        if cache and step in self.mass_cooficients_maps:
+        if len(self.mass_cooficients_maps) <= step:
+            self.mass_cooficients_maps += [None for i in range(step - len(self.mass_cooficients_maps) + 1)]
+            
+        
+        if cache and not (self.mass_cooficients_maps[step] is None):
             if prt:
                 plt.imshow(self.mass_cooficients_maps[step])
             return self.mass_cooficients_maps[step]
         
-        mass_cooficients_matrix = np.ones((5,5),np.float32)/25
         mass_cooficients_map = cv2.filter2D(self.get_shifted_map(step),-1,mass_cooficients_matrix)
         
         mass_cooficients_map = mass_cooficients_map
@@ -131,20 +133,31 @@ class depth_map:
             
         return mass_cooficients_map
     
-    def get_mass_cooficients_maps(self, steps, save=True, cache=True, prt=False):
+    def get_mass_cooficients_maps(self, steps, mass_cooficients_matrix=np.ones((5,5),np.float32)/25, save=True, cache=True, prt=False):
+
         
-        if type(steps) == int:
-            steps = range(steps)
+        res = [None for i in range(steps)]
         
-        res = {}
+        for step in range(steps):
         
-        for step in steps:
-        
-            current_mass_cooficients_map = self.get_mass_cooficients_map(step, save=save, cache=cache)
+            current_mass_cooficients_map = self.get_mass_cooficients_map(step, mass_cooficients_matrix=mass_cooficients_matrix, save=save, cache=cache)
             
             res[step] = current_mass_cooficients_map
-            if save:
-                self.mass_cooficients_maps[step] = current_mass_cooficients_map
             
         return res
+    
+    def change_axis_in_mcm(self):
+        self.mass_cooficients_maps = np.swapaxes(self.mass_cooficients_maps, 0, 2)
+        self.mass_cooficients_maps = np.swapaxes(self.mass_cooficients_maps, 0, 1)
         
+    def get_depth_map(self):
+        self.depth_map = np.zeros(self.shape[:2])
+        for x in range(self.shape[0]):
+            for y in range(self.shape[1]):
+                self.depth_map[x,y] = np.argmax(self.mass_cooficients_maps[x,y]) + 1
+        return self.depth_map
+
+    def erase_resaults(self):
+        self.shifted_maps = []
+        self.mass_cooficients_maps = []
+        self.depth_map = []
