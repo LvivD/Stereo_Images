@@ -57,12 +57,18 @@ class depth_map:
 
         shift_correct_obj = np.zeros(self.shape[:2], dtype='int16')
         shift_correct_obj_one_color = np.zeros(self.shape[:2], dtype='int16')
-
+        
         for i in range(self.shape[2]):
-            shift_mask = shifted[:,:,i] <= 7
-            shift_correct_obj_one_color[shift_mask] = 256/4
-            shift_correct_obj += shift_correct_obj_one_color
-            
+#             shift_mask = shifted[:,:,i] <= 7
+# #             shift_mask = abs(shifted[:,:,i]) <= 7
+#             shift_correct_obj_one_color[shift_mask] = 256/4
+#             shift_correct_obj += shift_correct_obj_one_color
+            shift_correct_obj += ((shifted[:,:,i]//255)**2)//3
+
+                                    
+        shift_correct_obj -= 1
+        shift_correct_obj *= -255                          
+                                    
         if prt:
             plt.imshow(shift_correct_obj)
             
