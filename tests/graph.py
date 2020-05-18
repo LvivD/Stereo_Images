@@ -5,7 +5,7 @@ import numpy
 
 class Graph:
     def __init__(self, edges=[]):
-        self.graph = nx.DiGraph()
+        self.graph = nx.Graph()
         if edges:
             self.createGraph(edges)
 
@@ -16,16 +16,19 @@ class Graph:
         for edge in edges:
             self.graph.add_edge(edge[0], edge[1], capacity=edge[2])
 
-    def cut(self, terminalA: str, terminalB: str, flow_function=edmonds_karp) -> tuple:
-        cut_value, partition = nx.minimum_cut(
-            self.graph, 'x', 'y', flow_func=edmonds_karp)
-        reachable, non_reachable = partition
+    # def cut(self, terminalA: str, terminalB: str, flow_function=edmonds_karp) -> tuple:
+    #     cut_value, partition = nx.minimum_cut(
+    #         self.graph, terminalA, terminalB, flow_func=edmonds_karp)
+    #     reachable, non_reachable = partition
 
-        cutset = set()
-        for u, nbrs in ((n, self.graph[n]) for n in reachable):
-            cutset.update((u, v) for v in nbrs if v in non_reachable)
+    #     cutset = set()
+    #     for u, nbrs in ((n, self.graph[n]) for n in reachable):
+    #         cutset.update((u, v) for v in nbrs if v in non_reachable)
 
-        return cut_value, cutset
+    #     return cut_value, cutset
+
+    def cut(self, weight="capacity"):
+        return nx.stoer_wagner(self.graph, weight=weight)
 
 
 class Pixel:
@@ -45,11 +48,11 @@ def V(p: Pixel, q: Pixel, K=7, sigma=5):
     return 0
 
 
-def treminalWeight(p: Pixel, labeling_ab, neighbours):
-    summa = D(p.l)
-    for q in neighbours:
-        if q not in labeling_ab:
-            summa += V(p, q)
+# def treminalWeight(p: Pixel, labeling_ab, neighbours):
+#     summa = D(p.l)
+#     for q in neighbours:
+#         if q not in labeling_ab:
+#             summa += V(p, q)
 
 
 def edgeWeight(labelA, labelB):
