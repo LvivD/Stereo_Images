@@ -1,0 +1,8 @@
+DepthMap 
+    init: img_r, img_l
+    subtract: shift -> img
+    
+
+1) 2 img
+2) n subtraction
+3) build graph 

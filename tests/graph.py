@@ -14,7 +14,7 @@ class Graph:
 
     def addEdge(self, edges: tuple or list):
         for edge in edges:
-            self.graph.add_edge(edge[0], edge[1], capacity=edge[2])
+            self.graph.add_edge(edge[0], edge[1], weight=edge[2])
 
     # def cut(self, terminalA: str, terminalB: str, flow_function=edmonds_karp) -> tuple:
     #     cut_value, partition = nx.minimum_cut(
@@ -27,8 +27,20 @@ class Graph:
 
     #     return cut_value, cutset
 
-    def cut(self, weight="capacity"):
-        return nx.stoer_wagner(self.graph, weight=weight)
+    def cut(self):
+        cut_value, partition = nx.stoer_wagner(self.graph)
+        # partition = list(partition)
+        # partition.sort(key=lambda x: len(x))
+        cutset = set()
+        index = 0 if (len(partition[0]) < len(partition[1])) else 1
+        for u in partition[index]:
+            for v in partition[(index+1) % 2]:
+
+                try:
+                    cutset.add((u, v, self.graph[u][v]['weight']))
+                except KeyError:
+                    pass
+        return cut_value, cutset
 
 
 class Pixel:
@@ -63,4 +75,4 @@ if __name__ == "__main__":
     edges = [('x', 'a', 3.0), ('x', 'b', 1.0), ('a', 'c', 3.0),
              ('b', 'c', 5.0), ('b', 'd', 4.0), ('d', 'e', 2.0), ('c', 'y', 2.0), ('e', 'y', 3.0)]
     G = Graph(edges)
-    print(G.cut('x', 'y'))
+    print(G.cut())

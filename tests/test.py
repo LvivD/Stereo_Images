@@ -52,7 +52,7 @@ gr = Graph([
 ])
 
 
-res = gr.stoer()
+res = gr.cut()
 
 print(res[0])
 
