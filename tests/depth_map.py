@@ -1,13 +1,14 @@
-import copy
 import matplotlib
 import numpy as np
 import matplotlib.pyplot as plt
 from skimage import io
 import cv2
 
-class depth_map:
+class DepthMap:
     def __init__(self, img_left, img_right):
         self.shape = img_left.shape
+        
+        self.max_step = 0
         
         if len(img_left.shape) == 2:
             self.shape.append(1)
@@ -16,6 +17,34 @@ class depth_map:
         self.img_right = img_right
         self.shifted_maps = []
         self.mass_cooficients_maps = []
+
+    def shifted_photo(self, depth_map: np.ndarray, photo="l") -> np.ndarray:
+        if photo == "l":
+            working_image = self.img_left
+        elif photo == "r":
+            working_image = self.img_right
+        else:
+            raise ValueError("The value of photo parrameter should be 'r' or 'l'.")
+        
+        res_image = np.zeros(self.shape, dtype=int)
+
+        for x in range(self.shape[0]):
+            for y in range(self.shape[1]):
+                try:
+                    res_image[x,y] = working_image[x + depth_map[x, y] if x + depth_map[x, y] < self.shape[0] else self.shape[0] - 1,y]
+                except IndexError:
+                    print(depth_map[x, y], type(depth_map[x, y]))
+                    raise IndexError
+
+        return res_image
+
+                
+
+    def energy_function_absolute(self, depth_map: np.ndarray) -> float:
+        return np.sum(np.absolute(self.shifted_photo(depth_map) - self.img_right))
+
+    def energy_function_square(self, depth_map: np.ndarray) -> float:
+        return np.sum((self.shifted_photo(depth_map) - self.img_right)**2)
         
     def check_image_order(self):
         pass
@@ -84,12 +113,12 @@ class depth_map:
             
         return res
     
-#     @staticmethod
-#     def default_mass_cooficients_matrix(m, k=2):
-#         res = np.zeros((m,m), dtype=int)
-#         for i in range(-k, k+1):
-#             res += np.diag([1 for j in range(m-abs(i))], k=i)
-#         return res
+    @staticmethod
+    def default_mass_cooficients_matrix(m, k=2):
+        res = np.zeros((m,m), dtype=int)
+        for i in range(-k, k+1):
+            res += np.diag([1 for j in range(m-abs(i))], k=i)
+        return res
         
 #     def get_mass_cooficients_map1(self, step, save=True, cache=True, prt=False):
         
@@ -135,9 +164,12 @@ class depth_map:
     
     def get_mass_cooficients_maps(self, steps, mass_cooficients_matrix=np.ones((5,5),np.float32)/25, save=True, cache=True, prt=False):
 
+        if steps > self.max_step:
+            self.max_step = steps
         
-        res = [None for i in range(steps)]
-        
+#         res = [None for i in range(steps)]
+        res = np.zeros((steps, self.shape[0], self.shape[1]), dtype=int)
+    
         for step in range(steps):
         
             current_mass_cooficients_map = self.get_mass_cooficients_map(step, mass_cooficients_matrix=mass_cooficients_matrix, save=save, cache=cache)
@@ -146,18 +178,104 @@ class depth_map:
             
         return res
     
-    def change_axis_in_mcm(self):
-        self.mass_cooficients_maps = np.swapaxes(self.mass_cooficients_maps, 0, 2)
-        self.mass_cooficients_maps = np.swapaxes(self.mass_cooficients_maps, 0, 1)
+    def change_axis_in_mcm(self, mcm = None, save=False):
+        if mcm is None:
+            self.mass_cooficients_maps = np.swapaxes(self.mass_cooficients_maps, 0, 2)
+            self.mass_cooficients_maps = np.swapaxes(self.mass_cooficients_maps, 0, 1)
+            return self.mass_cooficients_maps
+        else:
+            mcm_new = mcm.copy()
+            mcm_new = np.swapaxes(mcm_new, 0, 2)
+            mcm_new = np.swapaxes(mcm_new, 0, 1)
+            if save:
+                self.mass_cooficients_maps = mcm_new
+            return mcm_new
         
-    def get_depth_map(self):
-        self.depth_map = np.zeros(self.shape[:2])
-        for x in range(self.shape[0]):
-            for y in range(self.shape[1]):
-                self.depth_map[x,y] = np.argmax(self.mass_cooficients_maps[x,y]) + 1
-        return self.depth_map
+    def get_depth_map(self, mcm = None):
+        if mcm is None:
+            self.depth_map = np.zeros(self.shape[:2], dtype=int)
+            for x in range(self.shape[0]):
+                for y in range(self.shape[1]):
+                    self.depth_map[x,y] = np.argmax(self.mass_cooficients_maps[x,y]) + 1
+            return self.depth_map
+        else:
+            depth_map = np.zeros(mcm.shape[:2])
+            for x in range(mcm.shape[0]):
+                for y in range(mcm.shape[1]):
+                    depth_map[x,y] = np.argmax(mcm[x,y]) + 1
+            return depth_map
 
     def erase_resaults(self):
         self.shifted_maps = []
         self.mass_cooficients_maps = []
         self.depth_map = []
+        
+        
+#     def get_depth_map_particular_zones(self, k, max_step = None):
+        
+#         if max_step is None:
+#             max_step = self.max_step//(2*k + 1)
+        
+#         self.depth_map = np.zeros(self.shape[:2])
+#         depth_map_sum = self.mass_cooficients_maps.copy()
+#         for x in range(self.mass_cooficients_maps.shape[0]):
+#             for y in range(self.mass_cooficients_maps.shape[1]):
+#                 for z in range(self.mass_cooficients_maps.shape[2]):
+#                     j = 1
+#                     for i in range(1, k+1):
+#                         try:
+#                             assert z-i >= 0
+#                             depth_map_sum[x,y,z] += self.mass_cooficients_maps[x,y,z-i]
+#                             j += 1
+#                         except AssertionError:
+#                             pass
+                        
+                        
+#                         try:
+#                             assert z+i < self.shape[2]
+#                             depth_map_sum[x,y,z] += self.mass_cooficients_maps[x,y,z+i]
+#                             j += 1
+#                         except AssertionError:
+#                             pass
+#                     depth_map_sum[x,y,z] //= j    
+                   
+                        
+#         k_mass_cooficients_maps = np.zeros((self.shape[0], self.shape[1], max_step))
+        
+#         kk = self.mass_cooficients_maps.shape[2]//max_step
+        
+#         for x in range(self.shape[0]):
+#             for y in range(self.shape[1]):
+#                 for z in range(max_step):
+#                     k_mass_cooficients_maps[x,y,z] = depth_map_sum[x,y,z*kk]
+                    
+        
+#         res = np.zeros(self.shape[:2])
+#         for x in range(self.shape[0]):
+#             for y in range(self.shape[1]):
+#                 res[x,y] = np.argmax(k_mass_cooficients_maps[x,y]) + 1
+        
+#         return res
+        
+    
+    def  get_k_mass_cooficients_maps(self, k, steps, mass_cooficients_matrix=np.ones((5,5),np.float32)/25, save=False, cache=True, prt=False):
+        mass_cooficients_maps = self.get_mass_cooficients_maps(steps, mass_cooficients_matrix=mass_cooficients_matrix, save=save, cache=False, prt=False)
+       
+        print(mass_cooficients_maps.shape, DepthMap.default_mass_cooficients_matrix(mass_cooficients_maps.shape[0], 3).shape)
+        
+        
+        mass_cooficients_maps = np.matmul(
+            mass_cooficients_maps, DepthMap.default_mass_cooficients_matrix(mass_cooficients_maps.shape[0], 3)
+        )//3
+        
+        mass_cooficients_maps = self.change_axis_in_mcm(mcm = mass_cooficients_maps)
+        
+        res = self.get_depth_map(mcm)
+        
+        return res
+        
+            
+                    
+                        
+        
+        
