@@ -6,7 +6,7 @@ import cv2
 
 
 class DepthMap:
-    def __init__(self, img_left: , img_right):
+    def __init__(self, img_left, img_right):
 
         if img_left.shape != img_right:
             raise ValueError("The sizes of images should coinside.")
@@ -29,25 +29,26 @@ class DepthMap:
         elif photo == "r":
             working_image = self.img_right
         else:
-            raise ValueError("The value of photo parrameter should be 'r' or 'l'.")
-        
+            raise ValueError(
+                "The value of photo parrameter should be 'r' or 'l'.")
+
         res_image = np.zeros(self.shape, dtype=int)
 
         for x in range(self.shape[0]):
             for y in range(self.shape[1]):
                 try:
-                    res_image[x,y] = working_image[x + depth_map[x, y] if x + depth_map[x, y] < self.shape[0] else self.shape[0] - 1,y]
+                    res_image[x, y] = working_image[x + depth_map[x, y] if x +
+                                                    depth_map[x, y] < self.shape[0] else self.shape[0] - 1, y]
                 except IndexError:
                     print(depth_map[x, y], type(depth_map[x, y]))
                     raise IndexError
 
         return res_image
 
-                
-
     def energy_function_absolute(self, depth_map: np.ndarray) -> float:
 
-        e_data = np.sum(np.absolute(self.shifted_photo(depth_map) - self.img_right))
+        e_data = np.sum(np.absolute(
+            self.shifted_photo(depth_map) - self.img_right))
         e_smooth = 0
 
         return e_data + e_smooth
@@ -56,12 +57,5 @@ class DepthMap:
 
         e_data = np.sum((self.shifted_photo(depth_map) - self.img_right)**2)
         e_smooth = 0
-        
+
         return e_data + e_smooth
-
-
-
-
-
-
-
