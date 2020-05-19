@@ -20,14 +20,14 @@ class Graph:
                     V(self.pixel_matrix[x, y],
                         self.pixel_matrix[x + neighbor[0], y + neighbor[1]])
                 )
-                sum_of_v += values_of_v[len(values_of_v - 1)]
+                sum_of_v += values_of_v[len(values_of_v) - 1]
             except IndexError:
                 values_of_v.append(None)
         return sum_of_v, values_of_v
 
     def createGraph(self, depth_map: DepthMap):
 
-        self.pixel_matrix = np.zeros(depth_map.shape, dtype=Node)
+        self.pixel_matrix = np.zeros(depth_map.shape[:2], dtype=Node)
         self.terminal_nodes = [Terminal(i) for i in range(depth_map.max_step)]
 
         for x in range(depth_map.shape[0]):
@@ -38,31 +38,34 @@ class Graph:
         for x in range(self.pixel_matrix.shape[0]):
             for y in range(self.pixel_matrix.shape[1]):
 
-                sum_of_v, values_of_v = self._neighbours_helper(x, y)
+                sum_of_v, values_of_v = 0, []
+
+                for neighbor in ((0, 1), (1, 0), (0, -1), (-1, 0)):
+                    try:
+                        values_of_v.append(
+                            V(self.pixel_matrix[x, y],
+                                self.pixel_matrix[x + neighbor[0], y + neighbor[1]])
+                        )
+                        sum_of_v += values_of_v[len(values_of_v) - 1]
+                    except IndexError:
+                        values_of_v.append(None)
 
                 try:
-                    2*values_of_v[1]
-                    self.addEdge(
-                        self.pixel_matrix[x, y],
-                        self.pixel_matrix[x+1, y],
-                        V(self.pixel_matrix[x, y], self.pixel_matrix[x+1, y])
-                    )
-                except TypeError:
+                    self.addEdge(self.pixel_matrix[x, y], self.pixel_matrix[x+1, y], V(self.pixel_matrix[x, y], self.pixel_matrix[x+1, y])
+                                 )
+                except IndexError:
                     pass
                 try:
-                    2*values_of_v[2]
-                    self.addEdge(
-                        self.pixel_matrix[x, y],
-                        self.pixel_matrix[x, y+1],
-                        V(self.pixel_matrix[x, y], self.pixel_matrix[x, y+1]))
-                except TypeError:
+                    self.addEdge(self.pixel_matrix[x, y], self.pixel_matrix[x, y+1], V(
+                        self.pixel_matrix[x, y], self.pixel_matrix[x, y+1]))
+                except IndexError:
                     pass
 
                 self.addEdge(
                     self.pixel_matrix[x, y],
-                    self.terminal_nodes[self.pixel_matrix[x, y].lable],
-                    D(self.pixel_matrix[x, y], self.pixel_matrix[x +
-                                                                 self.pixel_matrix[x, y].lable]) + sum_of_v
+                    self.terminal_nodes[self.pixel_matrix[x, y].label],
+                    D(self.pixel_matrix[x, y], self.pixel_matrix[x -
+                                                                 self.pixel_matrix[x, y].label, y]) + sum_of_v
                 )
 
     def createGraph_deprecated(self, edges):
@@ -76,12 +79,34 @@ class Graph:
         self.graph.add_edge(nodeA, nodeB, weight=weight)
 
     def optimize(self):
-        x, y = 0, 0
-        # while x < self.depth_map.shape[0]:
-        #     while y < self.depth_map.shape[1]:
-        #         sum_of_v, values_of_v = self._neighbours_helper(x, y)
-        #         for neighbour in ((1, 0), (0, -1)):
-        #             pass
+        for y in range(self.pixel_matrix.shape[1]):
+            x = 0
+            while x < self.pixel_matrix.shape[0]:
+                sum_of_v, values_of_v = self._neighbours_helper(x, y)
+                for neighbour in ((1, 0), (0, -1)):
+                    if self.pixel_matrix[x, y].label != self.pixel_matrix[x+neighbour[0], y+neighbour[1]].label:
+
+                        self.addEdge(
+                            self.pixel_matrix[x, y],
+                            self.terminal_nodes[self.pixel_matrix[x, y].label],
+                            D(self.pixel_matrix[x, y],
+                                self.pixel_matrix[x + self.pixel_matrix[x, y].label, y])
+                            + sum_of_v
+                        )
+
+                        self.addEdge(
+                            self.pixel_matrix[x+neighbour[0], y+neighbour[1]],
+                            self.terminal_nodes[self.pixel_matrix[x +
+                                                                  neighbour[0], y+neighbour[1]].label],
+                            D(self.pixel_matrix[x+neighbour[0], y+neighbour[1]],
+                                self.pixel_matrix[x+neighbour[0] + self.pixel_matrix[x+neighbour[0], y+neighbour[1]].label, y+neighbour[1]])
+                            + sum_of_v
+                        )
+                        if neighbour == (1, 0):
+                            x += 1
+                x += 1
+
+        cut_value, cut_set = self.cut()
 
     def cut(self):
         cut_value, partition = nx.stoer_wagner(self.graph)
@@ -112,7 +137,7 @@ class Pixel(Node):
         super().__init__(label)
         self.coor = coor
         self.intensity = intensity  # (left, right)
-        self.lable = label
+        self.label = label
 
 
 def D(p: Pixel, q: Pixel):
@@ -122,7 +147,7 @@ def D(p: Pixel, q: Pixel):
 
 
 def V(p: Pixel, q: Pixel, K=80, sigma=5):
-    return K*max(sigma, abs(p.lable - q.lable))
+    return K*max(sigma, abs(p.label - q.label))
 
 # def treminalWeight(p: Node, labeling_ab, neighbours):
 #     summa = D(p.l)
