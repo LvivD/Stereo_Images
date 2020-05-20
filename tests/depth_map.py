@@ -12,7 +12,7 @@ class DepthMap:
         self.max_step = 0
 
         if len(img_left.shape) == 2:
-            self.shape.append(1)
+            self.shape = (img_left.shape[0],img_left.shape[1],1)
 
         self.img_left = img_left
         self.img_right = img_right

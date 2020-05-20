@@ -2,71 +2,96 @@ import networkx as nx
 from networkx.algorithms.flow import edmonds_karp
 import numpy as np
 from depth_map import DepthMap
+from itertools import combinations
 
 
 class Graph:
+    my_inf = 100500
+
     def __init__(self, edges=[]):
-        self.graph = nx.Graph()
-        self.pixel_matrix = np.zeros(0)
-        self.terminal_nodes = []
+        self.graph = nx.DiGraph()
+        self.upper_pixel_matrix = np.zeros(0)
+        self.lower_pixel_matrix = np.zeros(0)
+        self.upper_terminal_nodes = []
+        self.lower_terminal_nodes = []
         if edges:
             self.createGraph_deprecated(edges)
 
-    def _neighbours_helper(self, x, y):
-        values_of_v, sum_of_v = [], 0
+    def _count_sum_of_v(self, coords):
+        x = coords[0]
+        y = coords[1]
+        sum_of_v = 0
         for neighbor in ((0, 1), (1, 0), (0, -1), (-1, 0)):
             try:
-                values_of_v.append(
-                    V(self.pixel_matrix[x, y],
-                        self.pixel_matrix[x + neighbor[0], y + neighbor[1]])
-                )
-                sum_of_v += values_of_v[len(values_of_v) - 1]
+                sum_of_v += V(self.upper_pixel_matrix[coords],
+                              self.upper_pixel_matrix[x + neighbor[0], y + neighbor[1]])
             except IndexError:
-                values_of_v.append(None)
-        return sum_of_v, values_of_v
+                pass
+        return sum_of_v
 
     def createGraph(self, depth_map: DepthMap):
 
-        self.pixel_matrix = np.zeros(depth_map.shape[:2], dtype=Node)
-        self.terminal_nodes = [Terminal(i) for i in range(depth_map.max_step)]
+        self.upper_pixel_matrix = np.zeros(depth_map.shape[:2], dtype=Node)
+        self.lower_pixel_matrix = np.zeros(depth_map.shape[:2], dtype=Node)
+
+        self.upper_terminal_nodes = [
+            Terminal(i) for i in range(depth_map.max_step)]
+        self.lower_terminal_nodes = [
+            Terminal(i) for i in range(depth_map.max_step)]
+        for i in range(len(self.upper_terminal_nodes)):
+            self.addEdge(
+                self.upper_terminal_nodes[i], self.lower_terminal_nodes[i], Graph.my_inf)
+
 
         for x in range(depth_map.shape[0]):
             for y in range(depth_map.shape[1]):
-                self.pixel_matrix[x, y] = Pixel(
+                self.upper_pixel_matrix[x, y] = Pixel(
                     (x, y), depth_map.depth_map[x, y], (depth_map.img_left[x, y], depth_map.img_right[x, y]))
-
-        for x in range(self.pixel_matrix.shape[0]):
-            for y in range(self.pixel_matrix.shape[1]):
-
-                sum_of_v, values_of_v = 0, []
-
-                for neighbor in ((0, 1), (1, 0), (0, -1), (-1, 0)):
-                    try:
-                        values_of_v.append(
-                            V(self.pixel_matrix[x, y],
-                                self.pixel_matrix[x + neighbor[0], y + neighbor[1]])
-                        )
-                        sum_of_v += values_of_v[len(values_of_v) - 1]
-                    except IndexError:
-                        values_of_v.append(None)
-
-                try:
-                    self.addEdge(self.pixel_matrix[x, y], self.pixel_matrix[x+1, y], V(self.pixel_matrix[x, y], self.pixel_matrix[x+1, y])
-                                 )
-                except IndexError:
-                    pass
-                try:
-                    self.addEdge(self.pixel_matrix[x, y], self.pixel_matrix[x, y+1], V(
-                        self.pixel_matrix[x, y], self.pixel_matrix[x, y+1]))
-                except IndexError:
-                    pass
-
+                self.lower_pixel_matrix[x, y] = Lower(
+                    depth_map.depth_map[x, y], self.upper_pixel_matrix[x, y])
                 self.addEdge(
-                    self.pixel_matrix[x, y],
-                    self.terminal_nodes[self.pixel_matrix[x, y].label],
-                    D(self.pixel_matrix[x, y], self.pixel_matrix[x -
-                                                                 self.pixel_matrix[x, y].label, y]) + sum_of_v
+                    self.upper_pixel_matrix[x, y], self.lower_pixel_matrix[x, y], Graph.my_inf)
+        
+        print('step 0:', self.graph.number_of_edges())
+
+        for x in range(self.upper_pixel_matrix.shape[0]):
+            for y in range(self.upper_pixel_matrix.shape[1]):
+
+                sum_of_v = self._count_sum_of_v((x, y))
+
+                try:
+                    edge_value = V(
+                        self.upper_pixel_matrix[x, y], self.upper_pixel_matrix[x+1, y])
+                    self.addEdge(
+                        self.lower_pixel_matrix[x, y], self.upper_pixel_matrix[x+1, y], edge_value)
+                    self.addEdge(
+                        self.lower_pixel_matrix[x+1, y], self.upper_pixel_matrix[x, y], edge_value)
+                except IndexError:
+                    pass
+                try:
+                    edge_value = V(
+                        self.upper_pixel_matrix[x, y], self.upper_pixel_matrix[x, y+1])
+                    self.addEdge(
+                        self.lower_pixel_matrix[x, y], self.upper_pixel_matrix[x, y+1], edge_value)
+                    self.addEdge(
+                        self.lower_pixel_matrix[x, y+1], self.upper_pixel_matrix[x, y], edge_value)
+                except IndexError:
+                    pass
+
+                edge_value = D(
+                    self.upper_pixel_matrix[x, y], self.upper_pixel_matrix[x - self.upper_pixel_matrix[x, y].label, y]) + sum_of_v
+                self.addEdge(
+                    self.lower_pixel_matrix[x, y],
+                    self.upper_terminal_nodes[self.upper_pixel_matrix[x, y].label],
+                    edge_value
                 )
+                self.addEdge(
+                    self.lower_terminal_nodes[self.upper_pixel_matrix[x, y].label],
+                    self.upper_pixel_matrix[x, y],
+                    edge_value
+                )
+        print('graph number of edges =', self.graph.number_of_edges())
+        print('graph number of nodes =', self.graph.number_of_nodes())
 
     def createGraph_deprecated(self, edges):
         self.addEdges(edges)
@@ -79,45 +104,151 @@ class Graph:
         self.graph.add_edge(nodeA, nodeB, weight=weight)
 
     def optimize(self):
-        for y in range(self.pixel_matrix.shape[1]):
-            x = 0
-            while x < self.pixel_matrix.shape[0]:
-                sum_of_v, values_of_v = self._neighbours_helper(x, y)
-                for neighbour in ((1, 0), (0, -1)):
-                    if self.pixel_matrix[x, y].label != self.pixel_matrix[x+neighbour[0], y+neighbour[1]].label:
 
-                        self.addEdge(
-                            self.pixel_matrix[x, y],
-                            self.terminal_nodes[self.pixel_matrix[x, y].label],
-                            D(self.pixel_matrix[x, y],
-                                self.pixel_matrix[x + self.pixel_matrix[x, y].label, y])
-                            + sum_of_v
-                        )
+        # temp____________
+        temp_added = 0
+        temp_skiped = 0
+        temp_pixels_with_different_labels = 0
+        temp_lables_that_differ = set()
+        # temp____________
 
-                        self.addEdge(
-                            self.pixel_matrix[x+neighbour[0], y+neighbour[1]],
-                            self.terminal_nodes[self.pixel_matrix[x +
-                                                                  neighbour[0], y+neighbour[1]].label],
-                            D(self.pixel_matrix[x+neighbour[0], y+neighbour[1]],
-                                self.pixel_matrix[x+neighbour[0] + self.pixel_matrix[x+neighbour[0], y+neighbour[1]].label, y+neighbour[1]])
-                            + sum_of_v
-                        )
-                        if neighbour == (1, 0):
-                            x += 1
-                x += 1
+        for x in range(self.upper_pixel_matrix.shape[0]):
+            for y in range(self.upper_pixel_matrix.shape[1]):
 
-        cut_value, cut_set = self.cut()
+                for neighbour in ((1, 0), (0, 1)):
+                    this_node = (x, y)
+                    neighbour_node = (x+neighbour[0], y+neighbour[1])
+                    try:
+                        
 
-    def cut(self):
-        cut_value, partition = nx.stoer_wagner(self.graph)
+                        if self.upper_pixel_matrix[this_node].label != self.upper_pixel_matrix[neighbour_node].label:
+
+                            # temp____________
+                            temp_pixels_with_different_labels += 1
+                            if self.upper_pixel_matrix[this_node].label <= self.upper_pixel_matrix[neighbour_node].label:
+                                temp_lables_that_differ.add((self.upper_pixel_matrix[this_node].label, self.upper_pixel_matrix[neighbour_node].label))
+                            else:
+                                temp_lables_that_differ.add((self.upper_pixel_matrix[neighbour_node].label, self.upper_pixel_matrix[this_node].label))
+                            # temp____________
+
+                            # add possible_labels
+                            self.upper_pixel_matrix[this_node].possible_labels.add(self.upper_pixel_matrix[neighbour_node].label)
+                            self.upper_pixel_matrix[neighbour_node].possible_labels.add(self.upper_pixel_matrix[this_node].label)
+
+                            edge_value = D(self.upper_pixel_matrix[this_node],
+                                        self.upper_pixel_matrix[x - self.upper_pixel_matrix[neighbour_node].label, y]) + self._count_sum_of_v(this_node)
+                            self.addEdge(
+                                self.lower_pixel_matrix[this_node],
+                                self.upper_terminal_nodes[self.upper_pixel_matrix[neighbour_node].label],
+                                edge_value
+                            )
+                            self.addEdge(
+                                self.lower_terminal_nodes[self.upper_pixel_matrix[neighbour_node].label],
+                                self.upper_pixel_matrix[this_node],
+                                edge_value
+                            )
+
+                            edge_value = D(self.upper_pixel_matrix[neighbour_node], self.upper_pixel_matrix[x -
+                                                                                                            self.upper_pixel_matrix[this_node].label, y]) + self._count_sum_of_v(neighbour_node)
+                            self.addEdge(
+                                self.lower_pixel_matrix[neighbour_node],
+                                self.upper_terminal_nodes[self.upper_pixel_matrix[this_node].label],
+                                edge_value
+                            )
+                            self.addEdge(
+                                self.lower_terminal_nodes[self.upper_pixel_matrix[this_node].label],
+                                self.upper_pixel_matrix[neighbour_node],
+                                edge_value
+                            )
+                        # temp____________
+                        temp_added += 1
+                        # temp____________
+                    except IndexError:
+                        # temp____________
+                        temp_skiped += 1
+                        # print(this_node)
+                        # print(neighbour_node)
+                        # temp____________
+                        pass
+        
+        # temp____________
+        print(temp_added, temp_skiped, temp_pixels_with_different_labels)
+        print(len(temp_lables_that_differ))
+        # temp____________
+        
+        for pair in combinations(range(len(self.upper_terminal_nodes)), 2): # pairs of all terminals nodes
+            
+            # cut the graph when sourse is upper node of first terminal node and sink is the lower node of terminal node
+            if not nx.has_path(self.graph, self.lower_terminal_nodes[pair[0]], self.lower_terminal_nodes[pair[1]]):
+                continue
+            print('cut',pair)
+            cut_value, cut_set = nx.minimum_cut(self.graph, self.lower_terminal_nodes[pair[0]], self.lower_terminal_nodes[pair[1]])
+            # gets 2 sets where we should disconnect terminal nodes (upper and lower) from that set
+
+            if (self.upper_terminal_nodes[pair[0]] in cut_set[0] and self.lower_terminal_nodes[pair[0]] in cut_set[0] and
+                self.upper_terminal_nodes[pair[1]] in cut_set[1] and self.lower_terminal_nodes[pair[1]] in cut_set[1]):
+                first_node_set = cut_set[0] - {self.upper_terminal_nodes[pair[0]], self.lower_terminal_nodes[pair[0]]}
+                second_node_set = cut_set[1] - {self.upper_terminal_nodes[pair[1]], self.lower_terminal_nodes[pair[1]]}
+
+            elif (self.upper_terminal_nodes[pair[0]] in cut_set[1] and self.lower_terminal_nodes[pair[0]] in cut_set[1] and 
+                  self.upper_terminal_nodes[pair[1]] in cut_set[0] and self.lower_terminal_nodes[pair[1]] in cut_set[0]):
+                first_node_set = cut_set[1] - {self.upper_terminal_nodes[pair[1]], self.lower_terminal_nodes[pair[1]]}
+                second_node_set = cut_set[0] - {self.upper_terminal_nodes[pair[0]], self.lower_terminal_nodes[pair[0]]}
+
+            else: 
+                
+                print(len(cut_set[0]), len(cut_set[1]))
+
+                print(pair)
+
+
+                print(self.upper_terminal_nodes[pair[0]] in cut_set[0])
+                print(self.upper_terminal_nodes[pair[0]] in cut_set[1])
+                print(self.lower_terminal_nodes[pair[0]] in cut_set[0])
+                print(self.lower_terminal_nodes[pair[0]] in cut_set[1])
+
+                print(self.upper_terminal_nodes[pair[1]] in cut_set[0])
+                print(self.upper_terminal_nodes[pair[1]] in cut_set[1])
+                print(self.lower_terminal_nodes[pair[1]] in cut_set[0])
+                print(self.lower_terminal_nodes[pair[1]] in cut_set[1])
+
+
+
+                raise RuntimeError("cut didn't work")
+
+            # disconnects the sets from corresponding node and deletes wrong lables from possible_labels set
+            for edge in first_node_set:
+                # edge can be from upper or lower layer of nodes, so we need to check
+                if type(edge) == Lower:
+                    self.graph.remove_edge(edge ,self.upper_terminal_nodes[pair[0]])
+                elif type(edge) == Pixel:
+                    self.graph.remove_edge(self.lower_terminal_nodes[pair[0]], edge)
+                    edge.possible_labels -= self.lower_terminal_nodes[pair[0]].label 
+                
+            
+            for edge in second_node_set:
+                self.graph.remove_edge(edge ,self.upper_terminal_nodes[pair[1]])
+                self.graph.remove_edge(self.lower_terminal_nodes[pair[1]], edge)
+            
+
+            
+
+
+        
+
+        # cut_value, cut_set = self.cut()
+        # for edge in cut_set:
+        #     if isinstance(edge[0], Terminal):
+        #         self.terminal_nodes[edge[0].label].remove(edge[0])
+        #     elif isinstance(edge[1], Terminal):
+        #         self.terminal_nodes[edge[1].label].remove(edge[1])
+
+    def cut(self, TerminalA, TerminalB):
+        cut_value, partition = nx.minimum_cut(self.graph, TerminalA, TerminalB)
+        reachable, non_reachable = partition
         cutset = set()
-        index = 0 if (len(partition[0]) < len(partition[1])) else 1
-        for u in partition[index]:
-            for v in partition[(index+1) % 2]:
-                try:
-                    cutset.add((u, v, self.graph[u][v]['weight']))
-                except KeyError:
-                    pass
+        for u, nbrs in ((n, self.graph[n]) for n in reachable):
+            cutset.update((u, v) for v in nbrs if v in non_reachable)
         return cut_value, cutset
 
 
@@ -133,11 +264,19 @@ class Terminal(Node):
 
 
 class Pixel(Node):
-    def __init__(self, coor: list or tuple, label: int, intensity: tuple or list):
+    def __init__(self, coor: list or tuple, label: int, intensity: tuple or list, possible_labels=set()):
         super().__init__(label)
         self.coor = coor
         self.intensity = intensity  # (left, right)
         self.label = label
+        self.possible_labels = possible_labels
+        self.possible_labels.add(label)
+
+
+class Lower(Node):
+    def __init__(self, label: int, upper: Node):
+        super().__init__(label)
+        self.upper = upper
 
 
 def D(p: Pixel, q: Pixel):

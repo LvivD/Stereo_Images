@@ -1,59 +1,59 @@
-# # import graph
-# import networkx as nx
-# # gr = graph.Graph([
-# #     ('1', '2', 10),
-# #     ('1', '3', 5),
-# #     ('3', '2', 7),
-# #     ('4', '2', 12),
-# #     ('3', '4', 4),
-# # ])
-
-# # # res = gr.cut('1', '4')
-
-# # res = gr.stoer()
-
-
-# # print(res[0])
-
-# # print(res[1])
-
-# G = nx.Graph()
-# G.add_edge('x', 'a', weight=3)
-# G.add_edge('x', 'b', weight=1)
-# G.add_edge('a', 'c', weight=3)
-# G.add_edge('b', 'c', weight=5)
-# G.add_edge('b', 'd', weight=4)
-# G.add_edge('d', 'e', weight=2)
-# G.add_edge('c', 'y', weight=2)
-# G.add_edge('e', 'y', weight=3)
-# cut_value, partition = nx.stoer_wagner(G)
-# print(cut_value)
-
+from skimage import io
+from depth_map import DepthMap
+import numpy as np
+import matplotlib.pyplot as plt
 
 from graph import Graph
 
-# gr = Graph([
-#     ('1', '21', 10),
-#     ('1', '31', 5),
-#     ('21', '22', float('inf')),
-#     ('31', '32', float('inf')),
-#     ('22', '31', 7),
-#     ('32', '21', 7),
-#     ('22', '4', 12),
-#     ('32', '4', 4),
-# ])
 
-gr = Graph([
-    ('1', '2', 10),
-    ('1', '3', 5),
-    ('3', '2', 7),
-    ('4', '2', 12),
-    ('3', '4', 4),
-])
+# img = []
+# for i in [1, 5]:
+#     img.append(
+#         io.imread("../datasets/scenes2001/tsukuba/scene1.row3.col" + str(i) + ".ppm"))
+
+# img = []
+# for i in [0, 1]:
+#     img.append(io.imread("../datasets/scenes2001/map/im" + str(i) + ".pgm"))
+
+img = []
+for i in [1,5]:
+    img.append(io.imread("../datasets/scenes2001/tsukuba/scene1.row3.col" + str(i) + ".ppm"))
 
 
-res = gr.cut()
+dm = DepthMap(img[0], img[1])
 
-print(res[0])
+a = dm.shift(21, prt=True)
+a = ((a//255)**2)*255
 
-print(res[1])
+dm.get_shifted_maps(60)
+
+dm.get_mass_cooficients_maps(60)
+
+mass_cooficients_matrix = np.matrix([[0, 0, 0, 0.05, 0.1, 0.2, 0.1, 0.05, 0, 0, 0],
+                                     [0, 0, 0.05, 0.1, 0.25, 0.4,
+                                         0.25, 0.1, 0.05, 0, 0],
+                                     [0, 0.05, 0.1, 0.25, 0.55, 0.6,
+                                         0.55, 0.25, 0.1, 0.05, 0],
+                                     [0.05, 0.1, 0.25, 0.55, 0.75, 1,
+                                         0.75, 0.55, 0.25, 0.1, 0.05],
+                                     [0.1, 0.25, 0.55, 0.75, 1, 1,
+                                         1, 0.75, 0.55, 0.25, 0.1],
+                                     [0.2, 0.4, 0.6, 1, 1, 1, 1, 1, 0.6, 0.4, 0.2],
+                                     [0.1, 0.25, 0.55, 0.75, 1, 1,
+                                         1, 0.75, 0.55, 0.25, 0.1],
+                                     [0.05, 0.1, 0.25, 0.55, 0.75, 1,
+                                         0.75, 0.55, 0.25, 0.1, 0.05],
+                                     [0, 0.05, 0.1, 0.25, 0.55, 0.6,
+                                         0.55, 0.25, 0.1, 0.05, 0],
+                                     [0, 0, 0.05, 0.1, 0.25, 0.4,
+                                         0.25, 0.1, 0.05, 0, 0],
+                                     [0, 0, 0, 0.05, 0.1, 0.2, 0.1, 0.05, 0, 0, 0]])/37.2
+
+dm.change_axis_in_mcm()
+
+res = dm.get_depth_map()
+
+
+G = Graph()
+G.createGraph(dm)
+G.optimize()
